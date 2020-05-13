@@ -214,3 +214,4 @@ class DLX:
             uncover(c,0)
 
     def solve(self):
+        
