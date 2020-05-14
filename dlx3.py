@@ -1,4 +1,15 @@
+''' Note that in the original dlx3.c file, the following macro is made
+#define itm itm
+#define aux colour
+When reading the following code and comparing to the c file you can assume all
+instances of len will be itm and aux will be colour
 
+Most instances of the mems macros have also been erased from the original file
+
+Each item of the input matrix is represented by an item struct,
+and each option is represented as a list of node structs. There's one
+node for each nonzero entry in the matrix.
+'''
 class node:
     def __init__(self, up, down, item, colour):
         self.up = up
@@ -21,18 +32,63 @@ class DLX:
     SECONDARY = 1
 
 
-
-    def __init__(self, columns, rows=None, rowNames=None):
+    def __init__(self, cols, rows):
 
         self.updates = 0
         self.cleansings = 0
 
-        self.itemcount = len(columns) + 1
+        self.itemcount = len(cols)
 
-        self.nodes
-        self.itms
+        self.nodes = []
+        self.itms = []
+        self.rownames = []          # unused so far, not sure if necessary
+        self.rowIdentifiers = []    # ditto ^^^
 
-        self.last_itm
+        # creating the list of items. columns should be formatted: (name, primary, upper bound, lower bound)
+        # first loop will link the primary items together and leave the secondary items isolated
+
+        prev = self.itemcount
+        cur = 0
+        for (name, type, low_bound, up_bound) in cols:
+            slack = up_bound - low_bound
+            if type == DLX.PRIMARY:
+                self.itms.append(item(name, prev, None ,up_bound, slack)) # only primary items are linked
+                prev = cur
+            else:
+                self.itms.append(item(name, cur, cur, up_bound, slack)) # secondary items point to thier own location
+            self.nodes.append(cur, cur, None, 0) # creating the header nodes
+            cur += 1
+        self.itms.append(item(None, prev, None, None, None)) # creating header item unsure what the bound and slack should be
+        self.nodes.append(node(cur, cur, None, 0)) # adding a dummy node for the item header
+
+        next = self.itemcount
+        cur = self.itms[next].prev
+        while cur != self.itemcount:
+            self.itms[cur].next = next
+            next = cur
+            cur = self.itms[next].prev # if something wonky happens change next to cur
+        self.itms[self.itemcount].next = next #linking the header item to the first primary item
+
+        self.header = self.itemcount # item header is positioned at the end of the items list
+
+        # creating the nodes with the info from the rows
+        nodect = self.itemcount
+        for row in rows:
+            for (item, colour) in row:
+                nodect += 1 # increase the node count by 1
+
+                t = self.nodes[item].itm + 1
+                self.nodes[item].itm = t # increasing the length of the linked list that is stored to reflect the newly added node
+                r = self.nodes[item].up # the bottom node in the list
+
+                self.nodes.append(node(r, item, item, colour)) # creating new node
+                # up is the node previously at the bottom of the list
+                # down is the header node
+                self.nodes[item].colour = nodect # storing the new last node in the linked list
+
+                self.nodes[r].down = nodect # ammending the last second last nodes down pointer
+                self.nodes[item].up = nodect # ammending the header nodes up pointer
+
 
     def cover(self, c, deact):
         if deact:
@@ -60,8 +116,8 @@ class DLX:
                     self.nodes[uu].down = dd
                     self.nodes[dd].up = uu
                     self.updates += 1
-                    t = self.nodes[cc].len - 1
-                    self.nodes[cc].len = t
+                    t = self.nodes[cc].itm - 1
+                    self.nodes[cc].itm = t
                 nn += 1
             rr = self.nodes[rr].down
 
@@ -81,8 +137,8 @@ class DLX:
 
                     self.nodes[uu].down = nn
                     self.nodes[dd].up = nn
-                    t = self.nodes[cc].len + 1
-                    self.nodes[cc].len = t
+                    t = self.nodes[cc].itm + 1
+                    self.nodes[cc].itm = t
                 nn += 1
 
             if react:
@@ -116,8 +172,8 @@ class DLX:
                         self.nodes[uu].down = dd
                         self.nodes[dd].up = uu
                         self.updates += 1
-                        t = self.nodes[cc].len - 1
-                        self.nodes[cc].len = t
+                        t = self.nodes[cc].itm - 1
+                        self.nodes[cc].itm = t
                     nn += 1
             elif rr != p:
                 self.cleansings += 1
@@ -147,8 +203,8 @@ class DLX:
                     if self.nodes[nn].colour >= 0:
                         self.nodes[uu].down = nn
                         self.nodes[dd].up = nn
-                        t = self.nodes[cc].len + 1
-                        self.nodes[cc].len = t
+                        t = self.nodes[cc].itm + 1
+                        self.nodes[cc].itm = t
                     nn -= 1
             rr = self.nodes[rr].up
 
@@ -172,8 +228,8 @@ class DLX:
                 self.nodes[uu].down = dd
                 self.nodes[dd].up = uu
                 self.updates += 1
-                t = self.nodes[cc].len - 1
-                self.nodes[cc].len = t
+                t = self.nodes[cc].itm - 1
+                self.nodes[cc].itm = t
             if nn == n:
                 break
             nn += 1
@@ -202,16 +258,15 @@ class DLX:
 
                         self.nodes[uu].down = nn
                         self.nodes[dd].up = nn
-                        t = self.nodes[cc].len + 1
-                        self.nodes[cc].len = t
+                        t = self.nodes[cc].itm + 1
+                        self.nodes[cc].itm = t
                     n += 1
             qq = rr
             rr = self.nodes[rr].down
         self.nodes[rr].up = qq
-        self.nodes[c].len += k
+        self.nodes[c].itm += k
 
         if not unblock:
             uncover(c,0)
 
     def solve(self):
-        

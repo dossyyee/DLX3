@@ -365,20 +365,20 @@ void untweak(int c,int x,int unblock){
 #line 1071 "dlx3.web"
 
 void print_state(void){
-register int l,p,c,q;
-fprintf(stderr,"Current state (level "O"d):\n",level);
-for(l= 0;l<level;l++){
-p= choice[l];
-c= (p<last_itm?p:nd[p].itm);
-if(!first_tweak[l])print_option(p,stderr,nd[c].down,scor[l]);
-else print_option(p,stderr,first_tweak[l],scor[l]);
-if(l>=show_levels_max){
-fprintf(stderr," ...\n");
-break;
-}
-}
-fprintf(stderr," "O"lld sols, "O"lld mems, and max level "O"d so far.\n",
-count,mems,maxl);
+    register int l,p,c,q;
+    fprintf(stderr,"Current state (level "O"d):\n",level);
+    for(l= 0;l<level;l++){
+        p= choice[l];
+        c= (p<last_itm?p:nd[p].itm);
+        if(!first_tweak[l])print_option(p,stderr,nd[c].down,scor[l]);
+        else print_option(p,stderr,first_tweak[l],scor[l]);
+        if(l>=show_levels_max){
+            fprintf(stderr," ...\n");
+            break;
+        }
+    }
+    fprintf(stderr," "O"lld sols, "O"lld mems, and max level "O"d so far.\n",
+            count,mems,maxl);
 }
 
 /*:45*//*46:*/
@@ -452,19 +452,19 @@ main(int argc,char*argv[]){
     }
     while(1){
         if(!fgets(buf,bufsize,stdin))break;
-        if(o,buf[p= strlen(buf)-1]!='\n')panic("Input line way too long");
-        for(p= 0;o,isspace(buf[p]);p++);
+        if(buf[p= strlen(buf)-1]!='\n')panic("Input line way too long");
+        for(p= 0;isspace(buf[p]);p++);
         if(buf[p]=='|'||!buf[p])continue;
         last_itm= 1;
         break;
     }
     if(!last_itm)panic("No items");
-    for(;o,buf[p];){
+    for(;buf[p];){
 /*16:*/
 #line 457 "dlx3.web"
 
         if(second==max_cols)stage= 0;else stage= 2;
-    start_name:for(j= 0;j<8&&(o,!isspace(buf[p+j]));j++){
+    start_name:for(j= 0;j<8&&(!isspace(buf[p+j]));j++){
         if(buf[p+j]==':'){
             if(stage)panic("Illegal `:' in item name");
 /*17:*/
