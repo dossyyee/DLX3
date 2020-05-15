@@ -701,7 +701,9 @@ main(int argc,char*argv[]){
        level<show_choices_max&&level>=maxl-show_choices_gap)
         fprintf(stderr,"Level "O"d:",level);
     for(o,k= cl[root].next;k!=root;o,k= cl[k].next){
-        o,s= cl[k].slack;if(s> cl[k].bound)s= cl[k].bound;
+        o,s= cl[k].slack;
+        if(s> cl[k].bound)
+            s= cl[k].bound;
         if((vbose&show_details)&&
            level<show_choices_max&&level>=maxl-show_choices_gap){
             if(cl[k].bound!=1||s!=0)fprintf(stderr," "O".8s("O"d:"O"d,"O"d)",
@@ -751,7 +753,8 @@ main(int argc,char*argv[]){
                 for(k= 0;k<level;k++){
                     pp= choice[k];
                     cc= pp<last_itm?pp:nd[pp].itm;
-                    if(!first_tweak[k])print_option(pp,stdout,nd[cc].down,scor[k]);
+                    if(!first_tweak[k])
+                        print_option(pp,stdout,nd[cc].down,scor[k]);
                     else print_option(pp,stdout,first_tweak[k],scor[k]);
                 }
                 fflush(stdout);
@@ -780,7 +783,7 @@ main(int argc,char*argv[]){
     advance:/*32:*/
 #line 725 "dlx3.web"
 
-    if((o,cl[best_itm].bound==0)&&(cl[best_itm].slack==0)){
+    if((cl[best_itm].bound==0)&&(cl[best_itm].slack==0)){
         if(cur_node==best_itm)goto backup;
     }else if(oo,nd[best_itm].len<=cl[best_itm].bound-cl[best_itm].slack)
         goto backup;
@@ -814,13 +817,13 @@ main(int argc,char*argv[]){
             o,cc= nd[pp].itm;
             if(cc<=0)o,pp= nd[pp].up;
             else{
-    if(cc<second){
-        oo,cl[cc].bound--;
-        if(cl[cc].bound==0)cover(cc,1);
-    }else{
-        if(!nd[pp].color)cover(cc,1);
-        else if(nd[pp].color> 0)purify(pp);
-    }
+                if(cc<second){
+                    oo,cl[cc].bound--;
+                    if(cl[cc].bound==0)cover(cc,1);
+                }else{
+                    if(!nd[pp].color)cover(cc,1);
+                    else if(nd[pp].color> 0)purify(pp);
+                }
                 pp++;
             }
         }
@@ -853,7 +856,8 @@ main(int argc,char*argv[]){
 /*:33*/
 #line 659 "dlx3.web"
 ;
-    backdown:if(level==0)goto done;
+    backdown:
+    if(level==0)goto done;
     level--;
     oo,cur_node= choice[level],best_itm= nd[cur_node].itm,score= scor[level];
     if(cur_node<last_itm)/*31:*/
