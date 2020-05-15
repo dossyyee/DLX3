@@ -7,17 +7,17 @@ instances of len will be itm and aux will be colour
 Most instances of the mems macros have also been erased from the original file
 
 Each item of the input matrix is represented by an item struct,
-and each option is represented as a list of node structs. There's one
+and each option is represented as a collection of node structs. There's one
 node for each nonzero entry in the matrix.
 '''
-class node:
+class Node:
     def __init__(self, up, down, item, colour):
         self.up = up
         self.down = down
         self.itm = item
         self.colour = colour
 
-class item:
+class Item:
     def __init__(self, name, prev, next, bound, slack):
         self.name = name
         self.prev = prev
@@ -33,61 +33,52 @@ class DLX:
 
 
     def __init__(self, cols, rows):
+        # columns is a list of item info where each item is in the form of a tuple
+        # each item info should be formatted: (name, primary, upper bound, lower bound)
+
+        # columns is a list of options where each option is a list of items covered and corresponding colour
+        # each should be formatted: [(item, colour), ... ,(item,colour)]
 
         self.updates = 0
         self.cleansings = 0
-
-        self.itemcount = len(cols)
 
         self.nodes = []
         self.itms = []
         self.rownames = []          # unused so far, not sure if necessary
         self.rowIdentifiers = []    # ditto ^^^
 
-        # creating the list of items. columns should be formatted: (name, primary, upper bound, lower bound)
-        # first loop will link the primary items together and leave the secondary items isolated
-
-        prev = self.itemcount
+        # creating the linked list of items
         cur = 0
+        prev = cur
+        start = None
         for (name, type, low_bound, up_bound) in cols:
             slack = up_bound - low_bound
-            if type == DLX.PRIMARY:
-                self.itms.append(item(name, prev, None ,up_bound, slack)) # only primary items are linked
+            if type == DLX.PRIMARY: # only primary items are linked
+                if start == None: start = cur # setting the start item of the linked list
+                self.itms.append(Item(name, prev, start ,up_bound, slack)) # adding an item
+                self.itms[prev].next = cur # ammending the previous items next pointer
+                self.itms[start].prev = cur # ammending the first items prev pointer
                 prev = cur
             else:
-                self.itms.append(item(name, cur, cur, up_bound, slack)) # secondary items point to thier own location
-            self.nodes.append(cur, cur, None, 0) # creating the header nodes
+                self.itms.append(Item(name, cur, cur, up_bound, slack)) # secondary items point to thier own location
+            self.nodes.append(Node(cur, cur, 0, 0)) # creating the header nodes
             cur += 1
-        self.itms.append(item(None, prev, None, None, None)) # creating header item unsure what the bound and slack should be
-        self.nodes.append(node(cur, cur, None, 0)) # adding a dummy node for the item header
-
-        next = self.itemcount
-        cur = self.itms[next].prev
-        while cur != self.itemcount:
-            self.itms[cur].next = next
-            next = cur
-            cur = self.itms[next].prev # if something wonky happens change next to cur
-        self.itms[self.itemcount].next = next #linking the header item to the first primary item
-
-        self.header = self.itemcount # item header is positioned at the end of the items list
-
-        # creating the nodes with the info from the rows
-        nodect = self.itemcount
+        
+        # creating the linked node list
+        nnindex = len(self.nodes) # Index where the new nodes will be placed
         for row in rows:
             for (item, colour) in row:
-                nodect += 1 # increase the node count by 1
 
                 t = self.nodes[item].itm + 1
                 self.nodes[item].itm = t # increasing the length of the linked list that is stored to reflect the newly added node
                 r = self.nodes[item].up # the bottom node in the list
+                self.nodes.append(Node(r, item, item, colour)) # creating new node
+                self.nodes[item].colour = nnindex # storing the new last node in the linked list
+                self.nodes[r].down = nnindex # ammending the previous nodes' down pointer
+                self.nodes[item].up = nnindex # ammending the header nodes' up pointer
+                nnindex += 1 # increase the new node index
 
-                self.nodes.append(node(r, item, item, colour)) # creating new node
-                # up is the node previously at the bottom of the list
-                # down is the header node
-                self.nodes[item].colour = nodect # storing the new last node in the linked list
-
-                self.nodes[r].down = nodect # ammending the last second last nodes down pointer
-                self.nodes[item].up = nodect # ammending the header nodes up pointer
+        self.partialsolution = [] # Solution options will be appended here  Note!!! will  need to implement a method of etraction the useful solutions
 
 
     def cover(self, c, deact):
@@ -131,7 +122,7 @@ class DLX:
                     dd = self.nodes[nn].down
                     cc = self.nodes[nn].itm
 
-                    if cc <=0
+                    if cc <= 0:
                         nn = uu
                         continue
 
@@ -268,5 +259,50 @@ class DLX:
 
         if not unblock:
             uncover(c,0)
-
+'''
     def solve(self):
+        level = 0
+
+        forward()
+
+        def forward():
+            yadda
+            yadda
+            yadda
+
+            if score <= 0: backdown()
+
+            if score == infty:
+                visit solution
+                backdown()
+            cleared the rest
+
+            advance()
+
+        def advance():
+            if current node offlimits:
+                maybe tweak
+                backup()
+
+            increase level
+            forward()
+
+        def backup():
+            restore original
+
+        def backdown():
+            if level == 0:
+                done()
+
+            if curnode < lastitm:
+                backup()
+
+            uncover stuff
+            other shinanigans
+            advance()
+
+        def done():
+            return
+            the soltuions
+            stoof
+'''

@@ -1,18 +1,29 @@
-"""
-    attempting to simplify the creation of the header items
-"""
+from dlx3 import DLX
 
-#self.itms = [item(None,None,None,None,None) for i in range(self.itemcount + 1)]
-prev = self.itemcount
-cur = 0
-for (name, type, low_bound, up_bound) in cols:
-    slack = up_bound - low_bound
-    if type == DLX.PRIMARY:
-        self.itms.append(item(name, prev, None ,up_bound, slack)) # only primary items are linked
-        prev = cur
-    else:
-        self.itms.append(item(name, cur, cur, up_bound, slack)) # secondary items point to thier own location
-    self.nodes.append(cur, cur, None, 0) # creating the header nodes
-    cur += 1
-self.itms.append(item(None, prev, None, None, None)) # creating header item unsure what the bound and slack should be
-self.nodes.append(node(cur, cur, None, 0)) # adding a dummy node for the item header
+'''
+class h:
+    def __init__(self, num):
+        self.i = num
+
+    def outer(self):
+        def a():
+            self.i += 1
+            return b()
+        def b():
+            return self.i if self.i == 7 else a()
+
+        a()
+        return self.i
+
+H = h(2)
+'''
+names = ["0", "1", "2", "3", "4", "5"]
+primary = [0,0,0,0,1,1]
+bound = [1,1,1,1,1,1]
+cols = [(names[i], primary[i], bound[i], bound[i]) for i in range(6)]
+rows = [[(1,0),(3,0),(4,0)], [(0,0),(3,0),(4,0)], [(2,0),(5,0)]]
+
+thing = DLX(cols,rows)
+
+print([item.name for item in thing.itms])
+print([(node.up, node.down) for node in thing.nodes[len(names):]])
