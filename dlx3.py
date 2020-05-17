@@ -1,3 +1,4 @@
+from collections import defaultdict as dd
 ''' Note that in the original dlx3.c file, the following macro is made
 #define itm itm
 #define aux colour
@@ -37,8 +38,9 @@ class DLX:
 
 
     def __init__(self, cols, rows):
+        # NOTE!! All secondary items must be at the end of the rows list !!
         # columns is a list of item info where each item is in the form of a tuple
-        # each item info should be formatted: (name, primary, upper bound, lower bound)
+        # each item info should be formatted: (name, primary,lower bound, upper bound)
 
         # columns is a list of options where each option is a list of items covered and corresponding colour
         # each should be formatted: [(item, colour), ... ,(item,colour)]
@@ -46,48 +48,64 @@ class DLX:
         self.updates = 0
         self.cleansings = 0
 
-        self.nodes = []
-        self.itms = []
+        self.itms = [Item(None,0,0,0,0,0)] # initialise items with a header item
+        self.nodes = [Node(0,0,0,0)] # initialise nodes with the node corresponding to the header item
         self.rownames = []          # unused so far, not sure if necessary
-        self.rowIdentifiers = []    # ditto ^^^
-
+        self.rowid = [None] * (len(cols)+1)   # ditto ^^^
+        self.second = 0
         # creating the linked list of items
-        cur = 0
-        prev = cur
-        self.root = None # the first item in the linked list of items
+        cur = 1
+        prev = 0
+        self.root = 0 # the first item in the linked list of items
         for (name, type, low_bound, up_bound) in cols:
             slack = up_bound - low_bound
             if type == DLX.PRIMARY: # only primary items are linked
-                if self.root == None: self.root = cur # setting the start item of the linked list
                 self.itms.append(Item(name, prev, self.root ,up_bound, slack, type)) # adding an item
                 self.itms[prev].next = cur # ammending the previous items next pointer
-                self.itms[start].prev = cur # ammending the first items prev pointer
+                self.itms[self.root].prev = cur # ammending the first items prev pointer
                 prev = cur
+                self.second = cur + 1
             else:
                 self.itms.append(Item(name, cur, cur, up_bound, slack, type)) # secondary items point to thier own location
             self.nodes.append(Node(cur, cur, 0, 0)) # creating the header nodes
             cur += 1
 
+
         # creating the linked node list
         nnindex = len(self.nodes) # Index where the new nodes will be placed
-        for row in rows:
-            for (item, colour) in row:
-
-                t = self.nodes[item].itm + 1
-                self.nodes[item].itm = t # increasing the length of the linked list that is stored to reflect the newly added node
-                r = self.nodes[item].up # the bottom node in the list
-                self.nodes.append(Node(r, item, item, colour)) # creating new node
-                self.nodes[item].colour = nnindex # storing the new last node in the linked list
-                self.nodes[r].down = nnindex # ammending the previous nodes' down pointer
-                self.nodes[item].up = nnindex # ammending the header nodes' up pointer
-                nnindex += 1 # increase the new node index
-
+        i = 0
+        j = 0
+        prev = 0
+        for row, rowname in rows:
+            self.rownames.append(rowname)
+            if not self.onlySec(row):
+                self.rowid.append(j)
+                self.nodes.append(Node(prev, nnindex+len(row), -i,0)) #Creating spacer node
+                nnindex += 1
+                prev = nnindex
+                for (item, colour) in row:
+                    item += 1
+                    self.rowid.append(j)
+                    if self.itms[item].order == DLX.SECONDARY and colour == 0:
+                        colour = 100
+                    self.nodes[item].itm += 1 # increasing the length of the linked list that is stored to reflect the newly added node
+                    r = self.nodes[item].up # the bottom node in the list
+                    self.nodes.append(Node(r, item, item, colour)) # creating new node
+                    self.nodes[item].colour = len(self.nodes) - 1 # storing the new last node in the linked list
+                    self.nodes[r].down = nnindex # ammending the previous nodes' down pointer
+                    self.nodes[item].up = nnindex # ammending the header nodes' up pointer
+                    nnindex += 1 # increase the new node index
+                i+=1
+            j+=1
+        self.nodes.append(Node(nnindex - 1, 0,-i,0))
+        self.rowid.append(-1)
         self.partialsolution = [] # Solution options will be appended here  Note!!! will  need to implement a method of etraction the useful solutions
+        self.solutions = []
 
-        self.last_itm = len(cols) - 1
-        self.second = self.last_itm
+        self.last_itm = len(self.itms)
+        self.last_node = len(self.nodes) - 1
 
-        # variables used within the solve function
+        # variables used within the dance function
         self.level = None
         self.nodect = 0
         self.score = 0
@@ -99,10 +117,13 @@ class DLX:
         self.best_itm = 0
         self.count = 0
         self.maxl = 0
-        #self.thresh = 0
-        #self.delta = 0
 
+    def onlySec(self,row):
 
+        for (itm , _) in row:
+            if not self.itms[itm + 1].order:
+                return False
+        return True
 
     def cover(self, c, deact):
         if deact:
@@ -165,8 +186,8 @@ class DLX:
 
     def purify(self, p):
         cc = self.nodes[p].itm
-        x = self.nodes[p].color
-        self.nodes[cc].color = x
+        x = self.nodes[p].colour
+        self.nodes[cc].colour = x
         self.cleansings += 1
 
         rr = self.nodes[cc].down
@@ -197,7 +218,7 @@ class DLX:
 
     def unpurify(self, p):
         cc = self.nodes[p].itm
-        x = self.nodes[p].color
+        x = self.nodes[p].colour
 
         rr= self.nodes[cc].up
         while rr >= self.last_itm:
@@ -223,7 +244,6 @@ class DLX:
             rr = self.nodes[rr].up
 
     def tweak(self, n, block):
-
         if block:
             nn = n + 1
         else:
@@ -261,7 +281,7 @@ class DLX:
             if unblock:
                 nn = rr + 1
                 while nn != rr:
-                    if self.nodes[nn].colours >= 0:
+                    if self.nodes[nn].colour >= 0:
                         uu = self.nodes[nn].up
                         dd = self.nodes[nn].down
                         cc = self.nodes[nn].itm
@@ -274,21 +294,20 @@ class DLX:
                         self.nodes[dd].up = nn
                         t = self.nodes[cc].itm + 1
                         self.nodes[cc].itm = t
-                    n += 1
+                    nn += 1
             qq = rr
             rr = self.nodes[rr].down
         self.nodes[rr].up = qq
         self.nodes[c].itm += k
 
         if not unblock:
-            uncover(c,0)
+            self.uncover(c,0)
 
     def dance(self):
 
         self.level = 0
 
         def forward():
-
             self.score = DLX.INFTY
 
             k = self.itms[self.root].next
@@ -300,30 +319,30 @@ class DLX:
 
                 t= self.nodes[k].itm + s - self.itms[k].bound + 1
                 if t <= self.score:
-                    if (t < self.score) or (s < self.best_s) or (s == self.best_s and self.node[k].itm > self.best_l):
+                    if (t < self.score) or (s < self.best_s) or (s == self.best_s and self.nodes[k].itm > self.best_l):
                         self.score = t
                         self.best_itm = k
                         self.best_s = s
                         self.best_l = self.nodes[k].itm
-                        p = 1;
-                    elif s == self.best_s and self.nodes[k].itm == self.best_l:
-                        p += 1 # this many items achieve the min may not be necessary
                 k = self.itms[k].next
 
             if self.score <= 0:
                 backdown()
                 return
 
-            if self.score == infty:
+            if self.score == DLX.INFTY:
                 self.count += 1
+                self.partialsolution = []
                 for i in range(self.level):
                     pp = self.choice[i]
                     cc = pp if pp < self.last_itm else self.nodes[pp].itm
-                    try:
-                        if not self.first_tweak[i]:
-                            print_option(pp,stdout,nd[cc].down,self.scor[i]) # find what the hell this is doing will need to adapt it
-                    except:
-                        print_option(pp,stdout,self.first_tweak[i],self.scor[i])
+
+                    #self.record_option(pp)
+
+                    if not(pp < self.last_itm or pp >= self.last_node or self.nodes[pp].itm <= 0):
+                        self.partialsolution.append(self.rownames[self.rowid[pp]])
+
+                self.solutions.append(self.partialsolution)
                 if self.count > DLX.MAX_COUNT:
                     return
 
@@ -345,34 +364,35 @@ class DLX:
             except:
                 self.choice.append(self.nodes[self.best_itm].down)
 
-            self.cur_node = self.nodes[best_itm].down
+            self.cur_node = self.nodes[self.best_itm].down
 
-            if self.itms[best_itm].bound == 0 and self.itms[best_itm].slack == 0:
-                cover(self.best_itm,1)
+            self.itms[self.best_itm].bound -= 1
+            if self.itms[self.best_itm].bound == 0 and self.itms[self.best_itm].slack == 0:
+                self.cover(self.best_itm,1)
             else:
                 self.first_tweak[self.level] = self.cur_node
                 if self.itms[self.best_itm].bound == 0:
-                    cover(self.best_itm,1)
+                    self.cover(self.best_itm,1)
 
             advance()
             return
 
         def advance():
             if (self.itms[self.best_itm].bound == 0) and (self.itms[self.best_itm].slack==0):
-                if self.cur_node == best_itm:
+                if self.cur_node == self.best_itm:
                     backup()
                     return
             elif self.nodes[self.best_itm].itm <= (self.itms[self.best_itm].bound - self.itms[self.best_itm].slack):
                 backup()
                 return
             elif self.cur_node != self.best_itm:
-                tweak(self.cur_node, self.itms[self.best_itm].bound)
+                self.tweak(self.cur_node, self.itms[self.best_itm].bound)
             elif self.itms[self.best_itm].bound != 0:
                 # deactivate best item
-                p = cl[best_itm].prev
-                q = cl[best_itm].next
-                cl[p].next = q
-                cl[q].prev = p
+                p = self.itms[self.best_itm].prev
+                q = self.itms[self.best_itm].next
+                self.itms[p].next = q
+                self.itms[q].prev = p
 
             if self.cur_node > self.last_itm:
                 pp = self.cur_node + 1
@@ -381,36 +401,36 @@ class DLX:
                     if cc <= 0:
                         pp = self.nodes[pp].up
                     else:
-                        if cc < self.last_itm:
+                        if cc < self.second:
                             self.itms[cc].bound -= 1
                             if self.itms[cc].bound == 0:
-                                cover(cc,1)
+                                self.cover(cc,1)
                         else:
-                            if not self.nodes[pp].color:
-                                cover(cc,1)
-                            elif self.nodes[pp].color > 0):
-                                purify(pp)
+                            if not self.nodes[pp].colour:
+                                self.cover(cc,1)
+                            elif self.nodes[pp].colour > 0:
+                                self.purify(pp)
                         pp += 1
 
             self.level += 1
             if self.level > self.maxl:
-                if level >= DLX.MAX_LEVEL:
-                    error = true #there are too many levels, create function that will quit the function and maybe return found solutions
+                if self.level >= DLX.MAX_LEVEL:
+                    return #there are too many levels, quit the function and return solutions
                 self.maxl = self.level
             forward()
             return
 
         def backup():
             if(self.itms[self.best_itm].bound == 0) and (self.itms[self.best_itm].slack == 0):
-                uncover(self.best_itm,1)
+                self.uncover(self.best_itm,1)
             else:
-                untweak(self.best_itm,self.first_tweak[self.level],self.itms[self.best_itm].bound)
+                self.untweak(self.best_itm, self.first_tweak[self.level], self.itms[self.best_itm].bound)
             self.itms[self.best_itm].bound += 1
             backdown()
             return
 
         def backdown():
-            if level == 0:
+            if self.level == 0:
                 return
             self.level -= 1
             self.cur_node = self.choice[self.level]
@@ -432,20 +452,21 @@ class DLX:
                 if cc <= 0:
                     pp = self.nodes[pp].down
                 else:
-                    if cc < self.last_itm:
+                    if cc < self.second:
                         if self.itms[cc].bound == 0:
-                            uncover(cc,1)
+                            self.uncover(cc,1)
                         self.itms[cc].bound += 1
                     else:
-                        if not self.nodes[pp].color:
-                            uncover(cc,1)
-                        elif self.nodes[pp].color > 0:
-                            unpurify(pp)
+                        if not self.nodes[pp].colour:
+                            self.uncover(cc,1)
+                        elif self.nodes[pp].colour > 0:
+                            self.unpurify(pp)
                     pp -= 1
+            self.choice[self.level] = self.nodes[self.cur_node].down;
             self.cur_node = self.nodes[self.cur_node].down
-            self.choice[level] = self.nodes[self.cur_node].down;
+
             advance()
             return
 
         forward()
-        return
+        return self.solutions
