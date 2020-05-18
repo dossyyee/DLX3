@@ -43,16 +43,18 @@ class DLX:
         # each item info should be formatted: (name, primary,lower bound, upper bound)
 
         # columns is a list of options where each option is a list of items covered and corresponding colour
-        # each should be formatted: [(item, colour), ... ,(item,colour)]
+        # each should be formatted: ([(item, colour), ... ,(item,colour)], "rowname")
+        # if there is no colour, then colour = None
 
         self.updates = 0
         self.cleansings = 0
 
         self.itms = [Item(None,0,0,0,0,0)] # initialise items with a header item
         self.nodes = [Node(0,0,0,0)] # initialise nodes with the node corresponding to the header item
-        self.rownames = []          # unused so far, not sure if necessary
-        self.rowid = [None] * (len(cols)+1)   # ditto ^^^
-        self.second = 0
+        self.rownames = []
+        self.rowid = [None] * (len(cols)+1)
+        self.second = 0 # Location where the first secondary item is
+
         # creating the linked list of items
         cur = 1
         prev = 0
@@ -87,7 +89,9 @@ class DLX:
                     item += 1
                     self.rowid.append(j)
                     if self.itms[item].order == DLX.SECONDARY and colour == 0:
-                        colour = 100
+                        colour = 100 # Give all secondary nodes with a colour 0 a non zero value
+                    elif colour == None:
+                        colour = 0
                     self.nodes[item].itm += 1 # increasing the length of the linked list that is stored to reflect the newly added node
                     r = self.nodes[item].up # the bottom node in the list
                     self.nodes.append(Node(r, item, item, colour)) # creating new node
@@ -97,9 +101,9 @@ class DLX:
                     nnindex += 1 # increase the new node index
                 i+=1
             j+=1
-        self.nodes.append(Node(nnindex - 1, 0,-i,0))
-        self.rowid.append(-1)
-        self.partialsolution = [] # Solution options will be appended here  Note!!! will  need to implement a method of etraction the useful solutions
+        self.nodes.append(Node(prev, 0,-i,0))
+
+        self.partialsolution = []
         self.solutions = []
 
         self.last_itm = len(self.itms)
@@ -119,7 +123,6 @@ class DLX:
         self.maxl = 0
 
     def onlySec(self,row):
-
         for (itm , _) in row:
             if not self.itms[itm + 1].order:
                 return False
@@ -151,8 +154,8 @@ class DLX:
                     self.nodes[uu].down = dd
                     self.nodes[dd].up = uu
                     self.updates += 1
-                    t = self.nodes[cc].itm - 1
-                    self.nodes[cc].itm = t
+                    #t = self.nodes[cc].itm - 1
+                    self.nodes[cc].itm -= 1
                 nn += 1
             rr = self.nodes[rr].down
 
@@ -172,8 +175,8 @@ class DLX:
 
                     self.nodes[uu].down = nn
                     self.nodes[dd].up = nn
-                    t = self.nodes[cc].itm + 1
-                    self.nodes[cc].itm = t
+                    #t = self.nodes[cc].itm + 1
+                    self.nodes[cc].itm += 1
                 nn += 1
 
             if react:
@@ -207,8 +210,8 @@ class DLX:
                         self.nodes[uu].down = dd
                         self.nodes[dd].up = uu
                         self.updates += 1
-                        t = self.nodes[cc].itm - 1
-                        self.nodes[cc].itm = t
+                        #t = self.nodes[cc].itm - 1
+                        self.nodes[cc].itm -= 1
                     nn += 1
             elif rr != p:
                 self.cleansings += 1
@@ -238,8 +241,8 @@ class DLX:
                     if self.nodes[nn].colour >= 0:
                         self.nodes[uu].down = nn
                         self.nodes[dd].up = nn
-                        t = self.nodes[cc].itm + 1
-                        self.nodes[cc].itm = t
+                        #t = self.nodes[cc].itm + 1
+                        self.nodes[cc].itm += 1
                     nn -= 1
             rr = self.nodes[rr].up
 
@@ -262,8 +265,8 @@ class DLX:
                 self.nodes[uu].down = dd
                 self.nodes[dd].up = uu
                 self.updates += 1
-                t = self.nodes[cc].itm - 1
-                self.nodes[cc].itm = t
+                #t = self.nodes[cc].itm - 1
+                self.nodes[cc].itm -= 1
             if nn == n:
                 break
             nn += 1
@@ -292,8 +295,8 @@ class DLX:
 
                         self.nodes[uu].down = nn
                         self.nodes[dd].up = nn
-                        t = self.nodes[cc].itm + 1
-                        self.nodes[cc].itm = t
+                        #t = self.nodes[cc].itm + 1
+                        self.nodes[cc].itm += 1
                     nn += 1
             qq = rr
             rr = self.nodes[rr].down
