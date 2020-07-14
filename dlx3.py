@@ -1,19 +1,21 @@
-
 """
 Python implementation of Donald Knuths DLX3 algorithm
 By Hayden Goodwin 2020
 
 The following program is an implementation of Donald Knuths DLX3 algorithm.
-DLX3 is an extension of DLX1 and DLX 2 where the min an max amount of times an
-item is covered can be specified. It also includes the 'colour' of a node
+DLX3 is an extension of DLX1 and DLX 2 where the min an max amount of times
+an item is covered can be specified. It also includes the 'colour' of a node
 which allows only nodes with like colours to cover the same item.
 
 DLX3 by Knuth:
 https://www-cs-faculty.stanford.edu/~knuth/programs/dlx3.w
 
 It is recommended to have a look at the original source as it is very
-well documnted. NOTE: The original is written in cweb.
+well documented. Do note that the original is written in cweb and for those
+unfamiliar with the language, it is a recommended to read up on it first.
+
 """
+import functools
 
 class Node:
     def __init__(self, up, down, item, colour):
@@ -31,97 +33,120 @@ class Item:
         self.slack = slack
         self.order = order
 
-
 class DLX:
 
     PRIMARY = 0
     SECONDARY = 1
     INFTY = 100000000
-    MAX_LEVEL = 500
-    MAX_COUNT = 10**10
+    MAX_LEVEL = 500     # Maximum depth that DLX can search
+    MAX_COUNT = 10**10  # Maximum amount of solutions allowed
 
 
     def __init__(self, cols, rows):
-        # NOTE!! All secondary items must be at the end of the rows list !!
-        # columns is a list of item info where each item is in the form of a tuple
-        # each item info should be formatted: (name, order,lower bound, upper bound)
-        # name is a string
-        # order is a 0 or 1. 0 denotes Primary, 1 denotes Secondary
-        # lower bound and upper bound are integers which specify the range of
-        # nodes allowed to cover an item.
-        # NOTE: only primary items have bounds
+        """
+        Column Formatting:
+        cols is a list of item initialising values. Each item is in the form
+        of a list and should be formatted:  [name,
+                                             order,
+                                             lower bound,
+                                             upper bound
+                                             ]
+        name - is a unique object (usually a string)
+        order - is a 0 or 1. 0 denotes Primary, 1 denotes Secondary
+        lower bound and upper bound are integers which specify the range of
+        nodes allowed to cover an item.
 
-        # cols is a list of options (or rows)
-        # each option should be formatted: ( "rowname",[(item, colour), ... ,(item,colour)])
-        # rowname can be pretty much anything, usually its the name of the row
-        # colours can be any positive integer value (including 0) that isnt 100.
-        # if no colour is being used, it should be specified as None.
-        # NOTE: only secondary items have colours
+        IMPORTANT POINTS
+        - All secondary items must be at the end of the cols list
+        - Only primary items have bounds
+        - Only secondary items have colours
+        - Minimum lower bound of 1
+        - upper bound can be the same as lowerbound
+        - upper bound can never be lower than lower bound
+
+
+        Row Formatting:
+        rows is a list of options/nodes which cover a specific item. Each
+        row should be formatted: ["rowname",
+                                   [(item, colour), ... ,(item,colour)]
+                                   ]
+
+        rowname - a distinct identifiable object (e.g. a string)
+        item - an integer corresponding to the index of the item it covers
+        colour - any positive integer value (including 0) that isnt 100.
+
+        IMPORTANT POINTS
+        - If no colour is being used, it should be specified as None.
+        - The 'colour' 100 has been reserved for colourless nodes
+        """
 
         self.updates = 0
         self.cleansings = 0
 
-        self.itms = [Item(None,0,0,0,0,0)] # initialise items with a header item
-        self.nodes = [Node(0,0,0,0)] # initialise nodes with the node corresponding to the header item
+        self.itms = [Item(None, 0, 0, 0, 0, 0)]
+        self.nodes = [Node(0, 0, 0, 0)]
         self.rownames = []
-        self.rowid = [None] * (len(cols)+1)
-        self.second = 0 # Location where the first secondary item is
+        self.rowid = [None] * (len(cols) + 1)
+        self.second = 0 # Location of first secondary item
 
-        # creating the linked list of items
+        # Creating the linked list of items
         cur = 1
         prev = 0
-        self.root = 0 # the first item in the linked list of items
+        self.root = 0
         for (name, type, low_bound, up_bound) in cols:
             slack = up_bound - low_bound
-            if type == DLX.PRIMARY: # only primary items are linked
-                self.itms.append(Item(name, prev, self.root ,up_bound, slack, type)) # adding an item
-                self.itms[prev].next = cur # ammending the previous items next pointer
-                self.itms[self.root].prev = cur # ammending the first items prev pointer
+            if type == DLX.PRIMARY:   # Only primary items are linked
+                self.itms.append(Item(name,
+                                      prev,
+                                      self.root,
+                                      up_bound,
+                                      slack, type))
+                self.itms[prev].next = cur
+                self.itms[self.root].prev = cur
                 prev = cur
                 self.second = cur + 1
             else:
-                self.itms.append(Item(name, cur, cur, up_bound, slack, type)) # secondary items point to thier own location
-            self.nodes.append(Node(cur, cur, 0, 0)) # creating the header nodes
+                self.itms.append(Item(name, cur, cur, up_bound, slack, type))
+            self.nodes.append(Node(cur, cur, 0, 0)) # Creating the header nodes
             cur += 1
 
 
-        # creating the linked node list
+        # Creating the linked node list
         nnindex = len(self.nodes) # Index where the new nodes will be placed
         i = 0
         j = 0
         prev = 0
-        for row, rowname in rows:
+        for rowname, row in rows:
             self.rownames.append(rowname)
             if not self.onlySec(row):
                 self.rowid.append(j)
-                self.nodes.append(Node(prev, nnindex+len(row), -i,0)) #Creating spacer node
+                self.nodes.append(Node(prev, nnindex + len(row), -i, 0))
                 nnindex += 1
                 prev = nnindex
                 for (item, colour) in row:
                     item += 1
                     self.rowid.append(j)
                     if self.itms[item].order == DLX.SECONDARY and colour == 0:
-                        colour = 100 # Give all secondary nodes with a colour 0 a non zero value
+                        colour = 100
                     elif colour == None:
                         colour = 0
-                    self.nodes[item].itm += 1 # increasing the length of the linked list that is stored to reflect the newly added node
-                    r = self.nodes[item].up # the bottom node in the list
-                    self.nodes.append(Node(r, item, item, colour)) # creating new node
-                    self.nodes[item].colour = len(self.nodes) - 1 # storing the new last node in the linked list
-                    self.nodes[r].down = nnindex # ammending the previous nodes' down pointer
-                    self.nodes[item].up = nnindex # ammending the header nodes' up pointer
-                    nnindex += 1 # increase the new node index
+                    self.nodes[item].itm += 1
+                    r = self.nodes[item].up
+                    self.nodes.append(Node(r, item, item, colour))
+                    self.nodes[item].colour = len(self.nodes) - 1
+                    self.nodes[r].down = nnindex
+                    self.nodes[item].up = nnindex
+                    nnindex += 1
                 i+=1
             j+=1
         self.nodes.append(Node(prev, 0,-i,0))
 
-        self.partialsolution = []
-        self.solutions = []
-
         self.last_itm = len(self.itms)
         self.last_node = len(self.nodes) - 1
 
-        # other variables used while dancing
+        # Other variables used while dancing
+        self.partialsolution = []
+        self.solutions = []
         self.level = 0
         self.nodect = 0
         self.score = 0
@@ -142,10 +167,10 @@ class DLX:
 
     def cover(self, c, deact):
         if deact:
-            l = self.itms[c].prev
+            L = self.itms[c].prev
             r = self.itms[c].next
-            self.itms[l].next = r
-            self.itms[r].prev = l
+            self.itms[L].next = r
+            self.itms[r].prev = L
 
         self.updates += 1
 
@@ -189,13 +214,13 @@ class DLX:
                     self.nodes[cc].itm += 1
                 nn += 1
 
-            if react:
-                l = self.itms[c].prev
-                r = self.itms[c].next
-                self.itms[l].next = c
-                self.itms[r].prev = c
-
             rr = self.nodes[rr].down
+
+        if react:
+            L = self.itms[c].prev
+            r = self.itms[c].next
+            self.itms[L].next = c
+            self.itms[r].prev = c
 
     def purify(self, p):
         cc = self.nodes[p].itm
@@ -324,35 +349,41 @@ class DLX:
 
             t= self.nodes[k].itm + s - self.itms[k].bound + 1
             if t <= self.score:
-                if (t < self.score) or (s < self.best_s) or (s == self.best_s and self.nodes[k].itm > self.best_l):
+                if ((t < self.score)
+                    or (s < self.best_s)
+                    or (s == self.best_s and self.nodes[k].itm > self.best_l)):
                     self.score = t
                     self.best_itm = k
                     self.best_s = s
                     self.best_l = self.nodes[k].itm
             k = self.itms[k].next
 
+        if self.score < DLX.INFTY:
+            a =1
+
         if self.score <= 0:
-            self.backdown()
-            return
+            return self.backdown
 
         if self.score == DLX.INFTY:
+            # New solution has been found
             self.count += 1
             self.partialsolution = []
             for i in range(self.level):
                 pp = self.choice[i]
                 cc = pp if pp < self.last_itm else self.nodes[pp].itm
 
-                #self.record_option(pp)
-
-                if not(pp < self.last_itm or pp >= self.last_node or self.nodes[pp].itm <= 0):
+                # Record the partial solution
+                if not(pp < self.last_itm
+                       or pp >= self.last_node
+                       or self.nodes[pp].itm <= 0):
                     self.partialsolution.append(self.rownames[self.rowid[pp]])
 
             self.solutions.append(self.partialsolution)
-            if self.count > DLX.MAX_COUNT:
-                return
 
-            self.backdown()
-            return
+            if self.count > DLX.MAX_COUNT:
+                # Maximum amount of allowed solutions has been reached
+                return None
+            return self.backdown
 
         try:
             self.scor[self.level] = self.score
@@ -372,24 +403,27 @@ class DLX:
         self.cur_node = self.nodes[self.best_itm].down
 
         self.itms[self.best_itm].bound -= 1
-        if self.itms[self.best_itm].bound == 0 and self.itms[self.best_itm].slack == 0:
+        if (self.itms[self.best_itm].bound == 0
+            and self.itms[self.best_itm].slack == 0):
             self.cover(self.best_itm,1)
         else:
             self.first_tweak[self.level] = self.cur_node
             if self.itms[self.best_itm].bound == 0:
                 self.cover(self.best_itm,1)
 
-        self.advance()
-        return
+        return self.advance
 
     def advance(self):
-        if (self.itms[self.best_itm].bound == 0) and (self.itms[self.best_itm].slack==0):
+        if (self.itms[self.best_itm].bound == 0
+            and self.itms[self.best_itm].slack==0):
             if self.cur_node == self.best_itm:
-                self.backup()
-                return
-        elif self.nodes[self.best_itm].itm <= (self.itms[self.best_itm].bound - self.itms[self.best_itm].slack):
-            self.backup()
-            return
+                return self.backup
+
+        elif (self.nodes[self.best_itm].itm
+              <= (self.itms[self.best_itm].bound
+                  - self.itms[self.best_itm].slack)):
+            return self.backup
+
         elif self.cur_node != self.best_itm:
             self.tweak(self.cur_node, self.itms[self.best_itm].bound)
         elif self.itms[self.best_itm].bound != 0:
@@ -420,23 +454,29 @@ class DLX:
         self.level += 1
         if self.level > self.maxl:
             if self.level >= DLX.MAX_LEVEL:
-                return #there are too many levels, quit the function and return solutions
+                # Maximum level has been reached
+                return None
             self.maxl = self.level
-        self.forward()
-        return
+        return self.forward
 
     def backup(self):
-        if(self.itms[self.best_itm].bound == 0) and (self.itms[self.best_itm].slack == 0):
+        if (self.itms[self.best_itm].bound == 0
+            and self.itms[self.best_itm].slack == 0):
             self.uncover(self.best_itm,1)
         else:
-            self.untweak(self.best_itm, self.first_tweak[self.level], self.itms[self.best_itm].bound)
+            self.untweak(
+                self.best_itm,
+                self.first_tweak[self.level],
+                self.itms[self.best_itm].bound
+                )
         self.itms[self.best_itm].bound += 1
-        self.backdown()
-        return
+        return self.backdown
 
     def backdown(self):
+
         if self.level == 0:
-            return
+            # All possible solutions have been found
+            return None
         self.level -= 1
         self.cur_node = self.choice[self.level]
         self.best_itm = self.nodes[self.cur_node].itm
@@ -448,8 +488,7 @@ class DLX:
             q = self.itms[self.best_itm].next
             self.itms[p].next= self.best_itm
             self.itms[q].prev= self.best_itm
-            self.backup()
-            return
+            return self.backup
 
         pp = self.cur_node - 1
         while pp != self.cur_node:
@@ -470,13 +509,42 @@ class DLX:
         self.choice[self.level] = self.nodes[self.cur_node].down;
         self.cur_node = self.nodes[self.cur_node].down
 
-        self.advance()
-        return
+        return self.advance
 
     def dance(self):
         """
-        Starts the dancing links program and returns a list of solutions found.
+        Starts the dancing links program and returns a list of solutions.
+        The solutions are in the form of a list of 'rownames' so it is best
+        to ensure that rownames are unique so solutions are distinguishable.
         """
+        def tramampoline(func):
+            @functools.wraps(func)
+            def g(*args):
+                h = func
+                while h is not None:
+                    h = h(*args)
+                return args
+            return g()
 
-        self.forward()
+        tramampoline(self.forward)
+
         return self.solutions
+
+
+
+if __name__ == '__main__':
+
+    items = [[str(i), 0, 1, 2] for i in range(8)]
+    options = [['row1', [(0,None),(0,None),(0,None),(0,None)]],
+               ['row2', [(1,None),(7,None)]],
+               ['row3', [(2,None),(6,None),(1,None),(4,None),(5,None)]],
+               ['row4', [(0,None)]],
+               ['row5', [(3,None),(4,None),(0,None),(5,None)]],
+               ['row6', [(4,None),(2,None),(0,None)]],
+               ['row7', [(0,None),(1,None),(7,None),(2,None)]]
+               ]
+
+    matrix = DLX(items, options)
+    solutions = matrix.dance()
+    for solution in solutions:
+        print(solution)
