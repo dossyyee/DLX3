@@ -546,5 +546,6 @@ if __name__ == '__main__':
 
     matrix = DLX(items, options)
     solutions = matrix.dance()
+    
     for solution in solutions:
         print(solution)
